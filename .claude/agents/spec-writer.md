@@ -92,11 +92,26 @@ What is needed and why. Two sentences max.
 
 1. GIVEN [context] WHEN [action] THEN [result]
 2. ...
+
+## Model Router
+
+**Decision:** [Sonnet / General Engineer] or [Opus / Enterprise Architect]
+
+| Signal | Value | Verdict |
+|--------|-------|---------|
+| Files changed | [N] | ≥ 3 → Opus |
+| Modules spanned | [N] | ≥ 2 → Opus |
+| Architecture decision? | [Yes/No] | Yes → Opus |
+| Shared contract change? | [Yes/No] | Yes → Opus |
+
+## Sources
+
+- `path/to/file.ext:LINE_START-LINE_END` (branch: BRANCH, commit: SHORT_SHA) — what this confirms
 ```
 
 ### Arcade Step 3: Save and Confirm
 
-1. Before saving, verify the spec ends with a complete `## Sources` section. Every file path, method name, field name, return code, or constant referenced in the spec must have at least one entry. Each entry format: `` `repo-relative/path/to/file.ext:LINE_START-LINE_END` (branch: BRANCH, commit: SHORT_SHA) — what this line confirms about [specific claim] `` Line numbers, branch, and commit SHA are mandatory.
+1. Before saving, verify the spec ends with populated `## Model Router` and `## Sources` sections. Model Router must show the decision and filled-in table. Sources must cite every file path, method, field name, or constant in the spec. Each entry: `` `path:LINE-LINE` (branch: BRANCH, commit: SHA) — what this confirms ``. Line numbers, branch, and SHA are mandatory.
 2. Save to `docs/<TASK_ID>/SPEC.md`
 3. Present to engineer: *"Arcade spec ready — [N] acceptance criteria. Approve or add anything missing?"*
 4. Iterate once if needed.
@@ -210,6 +225,24 @@ How will this be verified?
 - Integration tests: what flows
 - Manual verification: what to click/check
 
+## Model Router
+
+**Decision:** [Sonnet / General Engineer] or [Opus / Enterprise Architect]
+
+Apply this decision tree to the "Files to Change" table above:
+
+| Signal | Value | Verdict |
+|--------|-------|---------|
+| Files changed | [N from Files to Change table] | ≥ 3 → Opus |
+| Modules spanned | [count top-level dirs from file paths] | ≥ 2 → Opus |
+| Architecture or design decision? | [Yes/No] | Yes → Opus |
+| Shared contract change? (API, DTO, webhook, SP) | [Yes/No] | Yes → Opus |
+| Failed fix attempts? | [N/A or count] | ≥ 2 → Opus |
+
+**Escalate to Opus / Enterprise Architect if:** [fill in any conditions specific to this task that would trigger escalation at implementation time]
+
+> Sub-agent note: if understanding the problem shape requires reading 10+ files or 2,000+ lines, run a large-context condensing script first, then re-route. See `hooks/model-router.md`.
+
 ## Sources
 
 Every factual claim in this spec must trace to at least one entry below.
@@ -219,7 +252,9 @@ Every factual claim in this spec must trace to at least one entry below.
 
 ### Step 4: Save and Confirm
 
-1. Before saving, verify the spec ends with a complete `## Sources` section. Every file path, method name, field name, return code, or constant referenced in the spec must have at least one entry. A spec without a populated `## Sources` section **must not be presented for approval**.
+1. Before saving, verify two sections are complete:
+   - **`## Model Router`**: Decision field is filled in (Sonnet or Opus). Table rows are filled from the "Files to Change" table — count files, count unique top-level directories, answer the Yes/No signals. Escalation conditions are written.
+   - **`## Sources`**: Every file path, method name, field name, return code, or constant cited anywhere in the spec has at least one entry. Format: `` `path:LINE-LINE` (branch: BRANCH, commit: SHORT_SHA) — what this confirms ``. A spec missing either section **must not be presented for approval**.
 2. Save the spec to `docs/<TASK_ID>/SPEC.md` in the repo
 3. Present the spec to the engineer for review
 4. Ask: "Does this match your understanding of the task? Any gaps?"
