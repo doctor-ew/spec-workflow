@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# install-global.sh — install /drprod and /dreng into ~/.claude/commands/
+# install-global.sh — install all workflow commands into ~/.claude/commands/
 #
-# These are session harness commands that work across ALL repos.
-# Run this once per machine, separate from per-repo install.sh.
+# Commands are global — they work in every repo without per-repo setup.
+# Hooks and agents still need per-repo install (use install.sh for that).
+#
+# Run once per machine after cloning, or re-run to update.
 #
 # Usage: ./install-global.sh
 
@@ -19,24 +21,33 @@ fi
 
 mkdir -p "$DST"
 
-echo "🌐 Installing global commands to ~/.claude/commands/"
+echo "🌐 Installing all workflow commands to ~/.claude/commands/"
 echo ""
+
+INSTALLED=0
+SKIPPED=0
 
 for f in "$SRC"/*.md; do
   name="$(basename "$f")"
   if [ -f "$DST/$name" ]; then
-    read -r -p "   $name already exists. Overwrite? [y/N] " confirm
-    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
-      echo "   Skipped $name"
-      continue
+    # Silently overwrite if content differs — this is an update run
+    if ! diff -q "$f" "$DST/$name" > /dev/null 2>&1; then
+      cp "$f" "$DST/$name"
+      echo "   ↑ updated  /$( basename "$name" .md )"
+      INSTALLED=$((INSTALLED + 1))
+    else
+      SKIPPED=$((SKIPPED + 1))
     fi
+  else
+    cp "$f" "$DST/$name"
+    echo "   ✓ installed /$( basename "$name" .md )"
+    INSTALLED=$((INSTALLED + 1))
   fi
-  cp "$f" "$DST/$name"
-  echo "   ✓ /$( basename "$name" .md ) → ~/.claude/commands/"
 done
 
 echo ""
-echo "✅ Done. Available in every repo (no --add-dir needed):"
+echo "✅ Done — $INSTALLED installed/updated, $SKIPPED already current."
 echo ""
-echo "   /drprod <ISSUE>   — fetch/create GitHub Issue → grounding Qs → /spec"
-echo "   /dreng  <ISSUE>   — adversarial claim verify → /implement"
+echo "   Harness:  /drprod <ISSUE>  /dreng <ISSUE>"
+echo "   Workflow: /spec  /implement  /review  /preflight  /investigate"
+echo "   Utils:    /review-spec  /unit-tests  /merge-conflicts  /propagate-fix"
