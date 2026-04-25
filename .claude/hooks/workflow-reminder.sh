@@ -12,12 +12,12 @@ The spec-driven development framework is active for this repo.
 
 **Before writing any code:**
 1. Ask what the engineer is working on
-2. If there's a GitHub Issue or task, run /drprod to start a guarded spec session
+2. If there's a GitHub Issue or task, run /drew-product to start a guarded spec session
 3. Read CLAUDE.md for repo-specific conventions and commands
 4. No code ships without an approved spec
 
-**Available commands:** /drprod · /dreng · /spec · /implement · /review · /review-spec · /preflight · /investigate
-**Harness flow:** /drprod <ISSUE> → approve → /dreng <ISSUE> → /implement <ISSUE>
+**Available commands:** /drew-product · /drew-eng · /spec · /implement · /review · /review-spec · /preflight · /investigate
+**Harness flow:** /drew-product <ISSUE> → approve → /drew-eng <ISSUE> → /implement <ISSUE>
 **Agents:** Spec Writer · Enterprise Architect · General Engineer · QA · Code Reviewer (see .claude/agents/)
 
 **SPEC GUARDRAIL is active.**

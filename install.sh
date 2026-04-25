@@ -11,7 +11,7 @@
 #   .claude/commands/  — /spec, /implement, /review, /review-spec, /preflight, /investigate
 #   .claude/settings.json — wires all hooks (SessionStart, PreToolUse, PostToolUse)
 #
-#   ~/.claude/commands/ — /drprod and /dreng (global harness commands, optional)
+#   ~/.claude/commands/ — /drew-product and /drew-eng (global harness commands, optional)
 
 set -e
 
@@ -56,7 +56,7 @@ fi
 
 echo ""
 
-# ── Global commands (/drprod + /dreng) ─────────────────────────────────────
+# ── Global commands (/drew-product + /drew-eng) ────────────────────────────
 
 GLOBAL_CMDS_SRC="$SCRIPT_DIR/.claude/global-commands"
 GLOBAL_CMDS_DST="$HOME/.claude/commands"
@@ -93,11 +93,11 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "  spec-workflow installed"
 echo ""
 echo "  Per-repo commands: /spec · /implement · /review · /preflight"
-echo "  Global commands:   /drprod · /dreng  (if installed above)"
+echo "  Global commands:   /drew-product · /drew-eng  (if installed above)"
 echo ""
 echo "  Harness flow:"
-echo "    /drprod <ISSUE>    fetch/create GH Issue → grounding Qs → /spec"
-echo "    /dreng  <ISSUE>    adversarial claim verify via code-fact-extractor"
+echo "    /drew-product <ISSUE>   fetch/create GH Issue → grounding Qs → /spec"
+echo "    /drew-eng <ISSUE>       adversarial claim verify + DRY/SOLID/Big O review"
 echo "    /implement <ISSUE> build from approved spec"
 echo ""
 echo "  SPEC GUARDRAIL active: SPEC*.md writes blocked without"

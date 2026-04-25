@@ -1,10 +1,10 @@
 ---
-name: drprod
-description: "Spec Production Harness — fetches or creates a GitHub Issue, asks three grounding questions, then runs /spec with Sources + Model Router enforcement injected. Run /drprod <ISSUE_NUMBER|TASK> to start."
+name: drew-product
+description: "Spec Production Harness — fetches or creates a GitHub Issue, asks three grounding questions, then runs /spec with Sources + Model Router enforcement injected. Run /drew-product <ISSUE_NUMBER|TASK> to start."
 argument-hint: <ISSUE_NUMBER|TASK>
 ---
 
-# /drprod — Spec Production Harness
+# /drew-product — Spec Production Harness
 
 Bootstraps a guarded spec-production session for a single GitHub Issue. Fetches or creates
 the issue via `gh`, asks three grounding questions to anchor intent, then delegates to `/spec`
@@ -20,9 +20,9 @@ questions anchor the brief to what the engineer actually intends to build.
 ## Usage
 
 ```
-/drprod 12          — fetch GitHub Issue #12, run spec harness
-/drprod DEMO-PRD    — search for an issue titled DEMO-PRD, or offer to create it
-/drprod stop        — clean up tracker state for current active task
+/drew-product 12          — fetch GitHub Issue #12, run spec harness
+/drew-product DEMO-PRD    — search for an issue titled DEMO-PRD, or offer to create it
+/drew-product stop        — clean up tracker state for current active task
 ```
 
 ---
@@ -32,7 +32,7 @@ questions anchor the brief to what the engineer actually intends to build.
 Read `$ARGUMENTS`. Trim whitespace.
 
 If empty, print usage and stop:
-> "Usage: /drprod <ISSUE_NUMBER|TASK> — fetches or creates a GitHub Issue and starts a guarded spec session."
+> "Usage: /drew-product <ISSUE_NUMBER|TASK> — fetches or creates a GitHub Issue and starts a guarded spec session."
 
 If `$ARGUMENTS` is `stop` → jump to **Stop Flow** at the bottom.
 
@@ -89,13 +89,13 @@ Body (first 400 chars):
 Ask: **"Is this the right issue? (yes / no)"**
 
 - **Yes** → set `ISSUE_NUMBER=N`, `ISSUE_TITLE=[title]`, continue to Step 4.
-- **No** → "Stopping. Re-run `/drprod` with the correct issue number or title." and exit.
+- **No** → "Stopping. Re-run `/drew-product` with the correct issue number or title." and exit.
 
 **If no issue found**, offer to create one:
 
 > "No GitHub Issue found for '**TASK**'. Want me to create one? (yes / no)"
 
-- **No** → "Stopping. Create the issue manually and re-run `/drprod <ISSUE_NUMBER>`." and exit.
+- **No** → "Stopping. Create the issue manually and re-run `/drew-product <ISSUE_NUMBER>`." and exit.
 - **Yes** → proceed to the guided creation flow below.
 
 ### Guided creation flow
@@ -224,7 +224,7 @@ After the spec is approved:
 TODAY=$(date +%Y-%m-%d)
 INIT_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 cat > "$TRACKER" << EOF
-# GH-${ISSUE_NUMBER} — /drprod Progress
+# GH-${ISSUE_NUMBER} — /drew-product Progress
 
 **Started:** ${TODAY}
 **Issue:** #${ISSUE_NUMBER} — ${ISSUE_TITLE}
@@ -236,7 +236,7 @@ cat > "$TRACKER" << EOF
 - [x] Grounding questions answered
 - [x] code-fact-extractor run
 - [x] Spec approved
-- [ ] /dreng verification
+- [ ] /drew-eng verification
 - [ ] /implement complete
 - [ ] PR opened
 
@@ -251,7 +251,7 @@ Add a comment to the GitHub issue linking the spec:
 gh issue comment "$ISSUE_NUMBER" \
   --body "Spec generated: \`docs/GH-${ISSUE_NUMBER}/SPEC.md\`
   
-Run \`/dreng GH-${ISSUE_NUMBER}\` for adversarial claim verification, then \`/implement GH-${ISSUE_NUMBER}\` to build."
+Run \`/drew-eng GH-${ISSUE_NUMBER}\` for adversarial claim verification, then \`/implement GH-${ISSUE_NUMBER}\` to build."
 ```
 
 ---
@@ -262,7 +262,7 @@ Print:
 
 > "Spec approved and saved to `docs/GH-ISSUE_NUMBER/SPEC.md`. GitHub Issue #ISSUE_NUMBER updated.
 >
-> **Next:** Run `/dreng GH-ISSUE_NUMBER` for adversarial claim verification before implementation,
+> **Next:** Run `/drew-eng GH-ISSUE_NUMBER` for adversarial claim verification before implementation,
 > or run `/implement GH-ISSUE_NUMBER` to go straight to building."
 
 ---
@@ -278,5 +278,5 @@ echo "Harness stopped."
 if [ -n "$TRACKER" ]; then
   echo "Tracker: $TRACKER"
 fi
-echo "Run /drprod <ISSUE_NUMBER> to start a new session."
+echo "Run /drew-product <ISSUE_NUMBER> to start a new session."
 ```

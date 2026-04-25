@@ -48,6 +48,6 @@ done
 echo ""
 echo "✅ Done — $INSTALLED installed/updated, $SKIPPED already current."
 echo ""
-echo "   Harness:  /drprod <ISSUE>  /dreng <ISSUE>"
+echo "   Harness:  /drew-product <ISSUE>  /drew-eng <ISSUE>"
 echo "   Workflow: /spec  /implement  /review  /preflight  /investigate"
 echo "   Utils:    /review-spec  /unit-tests  /merge-conflicts  /propagate-fix"
