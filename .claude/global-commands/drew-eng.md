@@ -1,6 +1,6 @@
 ---
 name: drew-eng
-description: "Adversarial Engineering Lane — loads an approved spec, verifies every technical claim against source code via code-fact-extractor, runs DRY/SOLID/ACID/CoC/Big O code review on spec'd files, saves artifacts to docs/{task}/, then hard-gates into /implement. Run /drew-eng <TASK> to start."
+description: "Adversarial Engineering Lane — loads an approved spec, verifies every technical claim against source code via code-fact-extractor, gates into /implement, then runs a post-implement drift review and saves DRIFT.md to docs/{task}/. Run /drew-eng <TASK> to start."
 argument-hint: <TASK>
 ---
 
@@ -10,8 +10,9 @@ Consumes an approved spec and adversarially verifies every technical claim befor
 line of code is written. The engineer decides each conflict — CONFIRM as written, or OVERRIDE
 with explicit reasoning. BLOCKED if unresolved claims remain. APPROVED gates into `/implement`.
 
-After claim verification, runs a DRY/SOLID/ACID/CoC/Big O review of all files the spec
-will touch, saving findings to `docs/TASK/REVIEW.md` as a pre-implementation baseline.
+After claim verification, gates into `/implement`. Once implementation is complete, runs
+a drift review comparing ticket → spec → code and saves findings to `docs/TASK/DRIFT.md`.
+Code review (DRY/SOLID/ACID/CoC/Big O) runs in `/drew-qa`.
 
 **Credible Hulk principle:** AI does all the verification legwork. The engineer carries the
 receipts and makes every override call. No claim reaches the codebase without a human sign-off.
@@ -206,14 +207,18 @@ Map results:
 | `NOT_FOUND` + `[EXISTING]` | Should exist, doesn't | Surface to challenge loop (Step 7) |
 | `NOT_FOUND` + `[NEW]` | Spec is creating it | Write `NET_NEW` citation silently, continue |
 
+**Before writing any citation entry:** copy the `Extracted at:` timestamp from the extractor
+report header. Use it as `extractor_run` in every entry written from this extractor call.
+If the report is missing this field, run `date -u +%Y-%m-%dT%H:%M:%SZ` and use that.
+
 **FOUND_MATCH — write silently:**
 ```json
-{"claim": "<text>", "status": "VERIFIED", "source": {"file": "<path>", "line": N}, "challenge": null, "override_reasoning": null, "risk_level": null}
+{"claim": "<text>", "status": "VERIFIED", "source": {"file": "<path>", "line": N}, "challenge": null, "override_reasoning": null, "risk_level": null, "extractor_run": "<ISO-8601 UTC timestamp>"}
 ```
 
 **NOT_FOUND + [NEW] — write silently:**
 ```json
-{"claim": "<text>", "status": "NET_NEW", "source": null, "challenge": "Not in codebase — being created by this spec.", "override_reasoning": null, "risk_level": null}
+{"claim": "<text>", "status": "NET_NEW", "source": null, "challenge": "Not in codebase — being created by this spec.", "override_reasoning": null, "risk_level": null, "extractor_run": "<ISO-8601 UTC timestamp>"}
 ```
 
 ---
@@ -236,7 +241,7 @@ Extractor result: <what the extractor actually found>
 
 **Choice A — CONFIRM:**
 ```json
-{"claim": "<text>", "status": "VERIFIED", "source": {"file": "<path or null>", "line": null}, "challenge": "<extractor finding>", "override_reasoning": null, "risk_level": null}
+{"claim": "<text>", "status": "VERIFIED", "source": {"file": "<path or null>", "line": null}, "challenge": "<extractor finding>", "override_reasoning": null, "risk_level": null, "extractor_run": "<ISO timestamp>"}
 ```
 
 **Choice B — OVERRIDE:**
@@ -245,12 +250,12 @@ Ask two follow-ups:
 2. "Risk level? HIGH / MEDIUM / LOW"
 
 ```json
-{"claim": "<text>", "status": "VERIFIED_WITH_OVERRIDE", "source": {"file": "<path or null>", "line": null}, "challenge": "<extractor finding>", "override_reasoning": "<engineer text>", "risk_level": "<HIGH|MEDIUM|LOW>"}
+{"claim": "<text>", "status": "VERIFIED_WITH_OVERRIDE", "source": {"file": "<path or null>", "line": null}, "challenge": "<extractor finding>", "override_reasoning": "<engineer text>", "risk_level": "<HIGH|MEDIUM|LOW>", "extractor_run": "<ISO timestamp>"}
 ```
 
 **Choice C — BLOCK:**
 ```json
-{"claim": "<text>", "status": "NOT_FOUND", "source": null, "challenge": "<extractor finding>", "override_reasoning": null, "risk_level": null}
+{"claim": "<text>", "status": "NOT_FOUND", "source": null, "challenge": "<extractor finding>", "override_reasoning": null, "risk_level": null, "extractor_run": "<ISO timestamp>"}
 ```
 
 Add to the blocked list.
@@ -304,6 +309,24 @@ Stop. Do not call /implement.
 DRENG GATE: APPROVED — all N claims verified or overridden with reasoning.
 ```
 
+Update the ACTIVE file phase to implement:
+
+```bash
+PROJECT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+ACTIVE="${PROJECT}/.claude/task-progress/ACTIVE"
+if [ -f "$ACTIVE" ]; then
+  EXISTING_INIT=$(grep CXENG_INIT_TIME "$ACTIVE" | cut -d= -f2 || true)
+  INIT_TIME="${EXISTING_INIT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+  TICKET=$(grep CXENG_TICKET "$ACTIVE" | cut -d= -f2 || echo "$TASK")
+  cat > "$ACTIVE" << EOF
+CXENG_TICKET=${TICKET}
+CXENG_PHASE=implement
+CXENG_INIT_TIME=${INIT_TIME}
+EOF
+  echo "Phase set: implement"
+fi
+```
+
 Continue to Step 9.
 
 ---
@@ -339,121 +362,143 @@ If no overrides: `"All N claims verified — no hot spots. Proceeding to code re
 
 ---
 
-## Step 10 — Code review of spec'd files
+## Step 10 — Call /implement
 
-Read the spec's **Files to Change** table. Collect all existing files listed (skip files tagged
-as new — they don't exist yet). For each file, read it fully.
+The hot-spot briefing is now in context. Invoke `/implement TASK` now.
 
-Run all five lenses against the collected files:
+`/implement` will read the spec at `docs/TASK/SPEC.md` and the citation file at
+`.claude/task-progress/TASK-citations.jsonl` for full claim detail.
 
-### DRY
-Check for duplicated logic, copy-pasted blocks, parallel data structures, inline constants
-repeated more than once, type predicates written multiple times for the same shape.
-
-### SOLID
-- **S** — Single Responsibility: function/component doing more than one thing?
-- **O** — Open/Closed: switch-on-type or if/else chains that will grow with new cases?
-- **L** — Liskov Substitution: implementations that break the contract of their interface?
-- **I** — Interface Segregation: fat interfaces where most callers use 2–3 fields?
-- **D** — Dependency Inversion: concrete dependencies wired directly into business logic?
-
-### ACID
-Apply to any code mutating state — context, store, API calls, DB writes:
-- **A** — Atomicity: multiple `setState` / writes that should be batched?
-- **C** — Consistency: missing validation before writes, invalid intermediate states?
-- **I** — Isolation: race conditions in async code, missing effect cleanup?
-- **D** — Durability: user input or critical data that could be lost without recovery?
-
-### CoC — Convention over Configuration
-Check names, file placement, and patterns against the repo's `CLAUDE.md`. Flag anything
-that diverges from conventions already established in adjacent code.
-
-### Big O — Algorithmic Complexity
-- **BLOCK**: O(n²) or worse in a hot path, N+1 query patterns, unbounded DB fetches
-- **WARN**: wrong data structure for access pattern, redundant passes over non-trivial collections
-- **NOTE**: minor inefficiency at current scale
-
-**Evidence rule:** every finding must cite `file:line`. Assertions without a location are not findings.
-
-**Exceptions:** one-time setup code, test data construction, provably small/bounded datasets.
+Wait for `/implement` to complete before proceeding to Step 11.
 
 ---
 
-## Step 11 — Save REVIEW.md artifact
+## Step 11 — Post-implement drift review
 
-Write the review to `$REVIEW` (`docs/TASK/REVIEW.md`):
+After implementation completes, compare ticket → spec → code to surface any divergence.
+
+### 11a — Collect sources
+
+```bash
+BASE=$(git merge-base HEAD main 2>/dev/null || git merge-base HEAD origin/main 2>/dev/null || echo "main")
+
+if echo "$TASK" | grep -qE '^GH-[0-9]+$'; then
+  ISSUE_NUM=$(echo "$TASK" | sed 's/GH-//')
+  gh issue view "$ISSUE_NUM" --json body,title
+  TICKET_IS_SPEC=false
+else
+  TICKET_IS_SPEC=true
+fi
+```
+
+If `TICKET_IS_SPEC=true`, the spec is the ticket — skip ticket ↔ spec check and note it in DRIFT.md.
+
+Read spec acceptance criteria from `$SPEC`. Get the implementation diff:
+```bash
+git diff "$BASE"...HEAD -- .
+```
+
+### 11b — Ticket ↔ Spec alignment (skip if TICKET_IS_SPEC=true)
+
+For each ticket AC → find it in spec: **COVERED** or **SPEC_GAP**.
+For each spec AC not traceable to a ticket AC: **SCOPE_DRIFT**.
+
+### 11c — Spec ↔ Code alignment
+
+For each spec AC, scan the diff for implementation evidence (**file:line required**):
+
+| Result | Meaning |
+|--------|---------|
+| `IMPLEMENTED` | Clear evidence in changed or new code |
+| `PARTIAL` | Present but incomplete |
+| `IMPL_GAP` | No evidence found |
+
+Print:
+```
+Drift scan complete:
+  SPEC_GAP:    N  (ticket ACs not in spec)
+  SCOPE_DRIFT: N  (spec ACs not in ticket)
+  IMPL_GAP:    N  (spec ACs not in code)
+  ALIGNED:     N
+```
+
+If SPEC_GAP > 0 or IMPL_GAP > 0:
+```
+⚠ DRIFT DETECTED — review before opening PR:
+  SPEC_GAP:  [list]
+  IMPL_GAP:  [list]
+```
+
+---
+
+## Step 12 — Save DRIFT.md
+
+```bash
+DRIFT="${PROJECT}/docs/${TASK}/DRIFT.md"
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+TODAY=$(date +%Y-%m-%d)
+```
+
+Write to `$DRIFT`:
 
 ```markdown
-## Pre-Implementation Code Review
+## Drift Review
 
 **Task:** TASK
 **Date:** YYYY-MM-DD
-**Scope:** Files listed in spec's Files to Change table (existing files only)
-**Reviewer:** drew-eng harness
-
-> This is a baseline review of files the spec will modify.
-> Findings here reflect the state of the code *before* implementation.
-> Address BLOCKs in your implementation plan; WARNs and NOTEs are at your discretion.
+**Branch:** BRANCH
+**Compared:** Ticket ↔ Spec ↔ Implementation
 
 ---
 
-### DRY
-| Severity | Finding | Location |
-|----------|---------|----------|
-[findings or "No findings."]
+### Ticket ↔ Spec Alignment
 
-### SOLID
-| Severity | Principle | Finding | Location |
-|----------|-----------|---------|----------|
-[findings or "No findings."]
+[If TICKET_IS_SPEC: "Spec used directly as ticket — alignment check skipped."]
 
-### ACID
-| Severity | Property | Finding | Location |
-|----------|----------|---------|----------|
-[findings or "No findings."]
+| Ticket Criterion | In Spec | Status |
+|-----------------|---------|--------|
+[rows or "(none detected)"]
 
-### CoC
-| Severity | Finding | Location |
-|----------|---------|----------|
-[findings or "No findings."]
+### Scope Drift (spec adds beyond ticket)
 
-### Big O
-| Severity | Complexity | Finding | Location |
-|----------|-----------|---------|----------|
-[findings or "No findings."]
+| Spec Requirement | Status |
+|-----------------|--------|
+[rows or "(none)"]
+
+### Spec ↔ Code Alignment
+
+| Spec Criterion | Evidence | Status |
+|---------------|---------|--------|
+[rows]
 
 ---
 
 ### Summary
-- BLOCK: N
-- WARN: N
-- NOTE: N
+- SPEC_GAP:    N
+- SCOPE_DRIFT: N
+- IMPL_GAP:    N
+- ALIGNED:     N
 
 ### Verdict
-[APPROVE / REQUEST CHANGES]
-[If REQUEST CHANGES: list BLOCK items that must be addressed during implementation]
+[ALIGNED / DRIFT_DETECTED — list SPEC_GAP + IMPL_GAP items by name]
 ```
 
-Print:
-```
-REVIEW saved: docs/TASK/REVIEW.md
-  BLOCK: N  WARN: N  NOTE: N
-```
-
-If BLOCKs exist, surface them prominently:
-```
-⚠ REVIEW BLOCKS — address these during implementation:
-  [file:line] Finding
-  ...
-These are pre-existing issues in files the spec will touch.
-BLOCKs do not stop /implement, but your implementation must not make them worse.
-```
+Print: `DRIFT saved: docs/TASK/DRIFT.md`
 
 ---
 
-## Step 12 — Call /implement
+## Step 13 — Handoff to /drew-qa
 
-The hot-spot briefing and REVIEW.md are now in context. Invoke `/implement TASK` now.
+```
+══════════════════════════════════════════════════════════════════
+TASK Implementation Complete
 
-`/implement` will read the spec at `docs/TASK/SPEC.md` and the citation file at
-`.claude/task-progress/TASK-citations.jsonl` for full claim detail.
+  Spec:         docs/TASK/SPEC.md
+  Drift report: docs/TASK/DRIFT.md
+  Citations:    .claude/task-progress/TASK-citations.jsonl
+
+Next: /drew-qa TASK
+  → Runs code review (DRY/SOLID/ACID/CoC/BigO), validates all ACs, runs tests.
+  → Saves REVIEW.md + QA.md. Gates into /drew-deploy.
+══════════════════════════════════════════════════════════════════
+```
